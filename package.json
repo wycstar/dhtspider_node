@@ -1,0 +1,31 @@
+{
+  "name": "p2pspider",
+  "description": "DHT Spider + BitTorrent Client = P2P Spider",
+  "version": "0.0.8",
+  "author": {
+    "name": "Fuck-You-GFW"
+  },
+  "repository": "https://github.com/Fuck-You-GFW/p2pspider",
+  "main": "lib/index.js",
+  "bugs": {
+    "url": "https://github.com/Fuck-You-GFW/p2pspider/issues"
+  },
+  "scripts": {},
+  "dependencies": {
+    "bencode": "^0.7.0",
+    "bitfield": "^1.1.2",
+    "iconv-lite": "^0.4.19",
+    "jschardet": "^1.5.1",
+    "moment": "^2.18.1",
+    "mongodb": "^2.2.31",
+    "pm2": "^2.7.1",
+    "sprintf-js": "latest"
+  },
+  "keywords": [
+    "torrent",
+    "bittorrent",
+    "p2p",
+    "dht"
+  ],
+  "license": "MIT"
+}
