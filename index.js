@@ -4,11 +4,12 @@ var P2PSpider = require('./lib');
 var chardet = require('jschardet');
 var iconv = require("iconv-lite");
 var mongo = require('mongodb').MongoClient;
+var redis = require("redis");
 var getFileType = require('./lib/filetype');
 
 var p2p = P2PSpider({
-    nodesMaxSize: 400,
-    maxConnections: 800,
+    nodesMaxSize: 1000,
+    maxConnections: 2000,
     timeout: 10000
 });
 
@@ -16,6 +17,7 @@ p2p.on('metadata', function (metadata) {
     var files = [];
     var resource_name = '';
     var utf_enable = false;
+    var redis_client = redis.createClient(process.env['REDIS_PORT'], process.env['REDIS_HOST']);
     var encoding_list = ['UTF-8', 'ascii', 'TIS-620', 'GB2312', 'Big5'];
 
     if(metadata.info.hasOwnProperty('name.utf-8')){
@@ -29,7 +31,6 @@ p2p.on('metadata', function (metadata) {
 
     var encoding = chardet.detect(resource_name).encoding;
     if(encoding_list.indexOf(encoding) < 0) return;
-
     if(metadata.info.hasOwnProperty('files')){
         metadata.info.files.forEach(function (t) {
             var item_name = t[ utf_enable === true ? 'path.utf-8' : 'path'].join('/');
@@ -46,50 +47,44 @@ p2p.on('metadata', function (metadata) {
             'l': metadata.info['length']
         })
     }
-    var insert_data = function (db, callback) {
-        var collection = db.collection(process.env['MONGO_COLLECTION']);
-        collection.updateOne({'_id': metadata.infohash},
-            {
-                '$setOnInsert': {
-                    '_id': metadata.infohash,
-                    'd': Math.floor(Date.now() / 1000),
-                    'n': iconv.decode(resource_name, encoding),
-                    's': files.length,
-                    'l': files.reduce(function (total, n) {
-                        return total + n['l']
-                    }, 0),
-                    'e': 1,
-                    't': getFileType(files)
-                },
-                '$set': {
-                    'm': Math.floor(Date.now() / 1000),
-                    'f': files
-                },
-                '$inc': {
-                    'c': 1
+
+    redis_client.hincrby(metadata.infohash, 'count', 1, function (err, res) {
+        redis_client.hset(metadata.infohash, 'fresh', Math.floor(Date.now() / 1000));
+        if(res === 1) {
+            var insert_data = function (db) {
+                var collection = db.collection(process.env['MONGO_COLLECTION']);
+                collection.insertOne({
+                        '_id': metadata.infohash,
+                        'd': Math.floor(Date.now() / 1000),
+                        'n': iconv.decode(resource_name, encoding),
+                        's': files.length,
+                        'l': files.reduce(function (total, n) {
+                            return total + n['l']
+                        }, 0),
+                        'e': 1,
+                        't': getFileType(files),
+                        'f': files
+                    },
+                    function (err, res) {
+                        if (err) {
+                            return;
+                        }
+                        db.close();
+                    });
+            };
+            mongo.connect('mongodb://' +
+                          process.env['MONGO_HOST'] +
+                          ':' +
+                          process.env['MONGO_PORT'] +
+                          '/' +
+                          process.env['MONGO_DB'], function(err, db) {
+                if(err){
+                    return
                 }
-            },
-            {upsert: true},
-            function (err, result) {
-                if (err) {
-                    return;
-                }
-                callback(result)
+                insert_data(db);
             });
-    };
-    mongo.connect('mongodb://' +
-                  process.env['MONGO_HOST'] +
-                  ':' +
-                  process.env['MONGO_PORT'] +
-                  '/' +
-                  process.env['MONGO_DB'], function(err, db) {
-        if(err){
-            return
         }
-        insert_data(db, function(result) {
-            db.close();
-        });
-    });
+    })
 });
 
 p2p.listen(6881, '0.0.0.0');
