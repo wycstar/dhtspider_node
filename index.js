@@ -4,11 +4,12 @@ var P2PSpider = require('./lib');
 var chardet = require('jschardet');
 var iconv = require("iconv-lite");
 var mongo = require('mongodb').MongoClient;
+var redis = require("redis");
 var getFileType = require('./lib/filetype');
 
 var p2p = P2PSpider({
-    nodesMaxSize: 400,
-    maxConnections: 800,
+    nodesMaxSize: 1000,
+    maxConnections: 2000,
     timeout: 10000
 });
 
@@ -16,6 +17,7 @@ p2p.on('metadata', function (metadata) {
     var files = [];
     var resource_name = '';
     var utf_enable = false;
+    var redis_client = redis.createClient(process.env['REDIS_PORT'], process.env['REDIS_HOST']);
     var encoding_list = ['UTF-8', 'ascii', 'TIS-620', 'GB2312', 'Big5'];
 
     if(metadata.info.hasOwnProperty('name.utf-8')){
@@ -29,7 +31,6 @@ p2p.on('metadata', function (metadata) {
 
     var encoding = chardet.detect(resource_name).encoding;
     if(encoding_list.indexOf(encoding) < 0) return;
-
     if(metadata.info.hasOwnProperty('files')){
         metadata.info.files.forEach(function (t) {
             var item_name = t[ utf_enable === true ? 'path.utf-8' : 'path'].join('/');
