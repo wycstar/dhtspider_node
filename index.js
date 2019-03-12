@@ -46,7 +46,15 @@ p2p.on('metadata', function (metadata) {
             'l': metadata.info['length']
         })
     }
-    var insert_data = function (db, callback) {
+    mongo.connect('mongodb://' +
+                  process.env['MONGO_HOST'] +
+                  ':' +
+                  process.env['MONGO_PORT'] +
+                  '/' +
+                  process.env['MONGO_DB'], function(err, db) {
+        if(err){
+            return
+        }
         var collection = db.collection(process.env['MONGO_COLLECTION']);
         collection.updateOne({'_id': metadata.infohash},
             {
@@ -74,21 +82,8 @@ p2p.on('metadata', function (metadata) {
                 if (err) {
                     return;
                 }
-                callback(result)
+                db.close();
             });
-    };
-    mongo.connect('mongodb://' +
-                  process.env['MONGO_HOST'] +
-                  ':' +
-                  process.env['MONGO_PORT'] +
-                  '/' +
-                  process.env['MONGO_DB'], function(err, db) {
-        if(err){
-            return
-        }
-        insert_data(db, function(result) {
-            db.close();
-        });
     });
 });
 
